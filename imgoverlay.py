@@ -13,6 +13,7 @@ class ImageOverlay(BaseOverlayWindow):
         self.image_label = None
         self.original_image = None
         self.current_image = None
+        self.aspect_ratio = None
         self.settings_manager = SettingsManager(self)
         self.setup_window()
         self.create_widgets()
@@ -75,6 +76,7 @@ class ImageOverlay(BaseOverlayWindow):
         # Bind events
         self.root.bind('<Escape>', lambda e: self.close_overlay())
         self.root.bind('<Button-3>', self.show_context_menu)
+        self.root.bind('<Configure>', self.on_window_resize)
         
         # Enable dragging for the main frame and image frame
         self.setup_drag_functionality(main_frame, self.image_frame)
@@ -105,18 +107,70 @@ class ImageOverlay(BaseOverlayWindow):
             return
             
         try:
-            # Load and resize image to fit the frame
+            # Load the original image
             self.original_image = Image.open(self.image_path)
+            img_width, img_height = self.original_image.size
             
+            # Store aspect ratio for window resizing
+            self.aspect_ratio = img_width / img_height
+            
+            # Calculate target window size (with some padding for controls)
+            max_width = self.root.winfo_screenwidth() - 100
+            max_height = self.root.winfo_screenheight() - 100
+            
+            # Scale image to fit screen if necessary
+            if img_width > max_width or img_height > max_height:
+                scale_x = max_width / img_width
+                scale_y = max_height / img_height
+                scale = min(scale_x, scale_y)
+                target_width = int(img_width * scale)
+                target_height = int(img_height * scale)
+            else:
+                target_width = img_width
+                target_height = img_height
+            
+            # Resize window to match image (plus padding for controls)
+            window_width = target_width + 20  # Padding for frame
+            window_height = target_height + 50  # Padding for top bar and frame
+            
+            # Get current window position
+            current_x = self.root.winfo_x()
+            current_y = self.root.winfo_y()
+            
+            # Resize and reposition window
+            self.root.geometry(f"{window_width}x{window_height}+{current_x}+{current_y}")
+            
+            # Wait for window to resize
+            self.root.update_idletasks()
+            
+            # Now display the image at the calculated size
+            self._update_image_display()
+            
+        except ImportError:
+            # Fallback if PIL is not available
+            messagebox.showerror(
+                "Missing Dependency", 
+                "PIL (Pillow) is required for image support.\n"
+                "Install it with: pip install Pillow"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not display image: {str(e)}")
+            
+    def _update_image_display(self):
+        """Update the image display based on current window size"""
+        if not self.original_image:
+            return
+            
+        try:
             # Get the current size of the image frame
             self.image_frame.update_idletasks()
             frame_width = self.image_frame.winfo_width() - 10
             frame_height = self.image_frame.winfo_height() - 10
             
             if frame_width <= 1 or frame_height <= 1:
-                frame_width, frame_height = 300, 200
+                return
             
-            # Calculate the scaling to fit the image in the frame
+            # Calculate the scaling to fit the image in the frame while maintaining aspect ratio
             img_width, img_height = self.original_image.size
             scale_x = frame_width / img_width
             scale_y = frame_height / img_height
@@ -148,15 +202,19 @@ class ImageOverlay(BaseOverlayWindow):
             # Enable dragging for the image
             self.setup_drag_functionality(self.image_label)
             
-        except ImportError:
-            # Fallback if PIL is not available
-            messagebox.showerror(
-                "Missing Dependency", 
-                "PIL (Pillow) is required for image support.\n"
-                "Install it with: pip install Pillow"
-            )
         except Exception as e:
-            messagebox.showerror("Error", f"Could not display image: {str(e)}")
+            print(f"Error updating image display: {e}")
+            
+    def on_window_resize(self, event):
+        """Handle window resize events to maintain aspect ratio"""
+        # Only handle resize events for the root window
+        if event.widget != self.root:
+            return
+            
+        # If we have an image loaded and aspect ratio stored
+        if self.original_image and self.aspect_ratio:
+            # Update the image display
+            self.root.after_idle(self._update_image_display)
             
     def clear_image(self):
         """Clear the current image"""
@@ -177,6 +235,10 @@ class ImageOverlay(BaseOverlayWindow):
         self.image_path = None
         self.original_image = None
         self.current_image = None
+        self.aspect_ratio = None
+        
+        # Reset window to default size
+        self.center_window(400, 300)
         
     def show_context_menu(self, event):
         """Show context menu on right-click"""
@@ -211,6 +273,8 @@ class ImageOverlay(BaseOverlayWindow):
         print("- Right-click: Context menu")
         print("- Drag window: Click and drag")
         print("- Load Image: Use button or context menu")
+        print("- Window resizes to image size automatically")
+        print("- Image scales with window while maintaining aspect ratio")
         
         super().run()
 
