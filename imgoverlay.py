@@ -36,7 +36,7 @@ class ImageOverlay(BaseOverlayWindow):
         """Create overlay content"""
         # Main container
         main_frame = self.create_styled_frame(self.root)
-        main_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        main_frame.pack(fill='both', expand=True)
 
         # Top bar with settings gear icon
         top_bar = self.create_styled_frame(main_frame, height=30)

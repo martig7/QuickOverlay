@@ -128,8 +128,8 @@ class BaseOverlayWindow(ABC):
             'secondary': {'bg': self.COLORS['bg_secondary']},
             'sunken': {
                 'bg': self.COLORS['bg_secondary'],
-                'relief': 'sunken',
-                'bd': 2
+                'relief': 'flat',
+                'bd': 0
             }
         }
         
@@ -193,10 +193,115 @@ class BaseOverlayWindow(ABC):
         """Update window transparency"""
         self.root.attributes('-alpha', float(value))
         
+    def smart_position_window(self, window, snap_threshold=25, force_on_screen=False, allow_multi_monitor=True):
+        """Master function to position window - snaps to edges if close, ensures on screen if needed"""
+        # Always get fresh coordinates from the window
+        current_x = window.winfo_x()
+        current_y = window.winfo_y()
+        window_width = window.winfo_width()
+        window_height = window.winfo_height()
+        
+        # Determine appropriate margin based on decoration state
+        is_borderless = window.overrideredirect()
+        margin = 1 if is_borderless else 10
+        
+        new_x = current_x
+        new_y = current_y
+        
+        if allow_multi_monitor:
+            # Multi-monitor friendly mode - only snap to visible screen edges
+            # Get all monitor bounds using tkinter's virtual screen info
+            try:
+                # Get virtual screen dimensions (all monitors combined)
+                virtual_width = window.winfo_vrootwidth()
+                virtual_height = window.winfo_vrootheight()
+                virtual_x = window.winfo_vrootx()
+                virtual_y = window.winfo_vrooty()
+                
+                # Calculate actual desktop bounds
+                desktop_left = virtual_x
+                desktop_right = virtual_x + virtual_width
+                desktop_top = virtual_y  
+                desktop_bottom = virtual_y + virtual_height
+                
+                # Only snap/constrain to the outer edges of the entire desktop
+                # LEFT EDGE (leftmost edge of all monitors)
+                if force_on_screen and current_x < desktop_left + margin:
+                    new_x = desktop_left + margin
+                elif abs(current_x - desktop_left) <= snap_threshold:
+                    new_x = desktop_left + margin
+                
+                # RIGHT EDGE (rightmost edge of all monitors)
+                if force_on_screen and current_x + window_width > desktop_right - margin:
+                    new_x = desktop_right - window_width - margin
+                elif abs(current_x + window_width - desktop_right) <= snap_threshold:
+                    new_x = desktop_right - window_width - margin
+                    
+                # TOP EDGE (topmost edge of all monitors)
+                if force_on_screen and current_y < desktop_top + margin:
+                    new_y = desktop_top + margin
+                elif abs(current_y - desktop_top) <= snap_threshold:
+                    new_y = desktop_top + margin
+                    
+                # BOTTOM EDGE (bottommost edge of all monitors)
+                if force_on_screen and current_y + window_height > desktop_bottom - margin:
+                    new_y = desktop_bottom - window_height - margin
+                elif abs(current_y + window_height - desktop_bottom) <= snap_threshold:
+                    new_y = desktop_bottom - window_height - margin
+                    
+            except:
+                # Fallback to single monitor mode if virtual screen info fails
+                allow_multi_monitor = False
+        
+        if not allow_multi_monitor:
+            # Single monitor mode (original behavior)
+            screen_width = window.winfo_screenwidth()
+            screen_height = window.winfo_screenheight()
+            
+            # LEFT EDGE
+            if force_on_screen and current_x < margin:
+                new_x = margin
+            elif current_x <= snap_threshold:
+                new_x = margin
+            
+            # RIGHT EDGE
+            right_edge_distance = screen_width - (current_x + window_width)
+            if force_on_screen and current_x + window_width > screen_width - margin:
+                new_x = screen_width - window_width - margin
+            elif right_edge_distance <= snap_threshold:
+                new_x = screen_width - window_width - margin
+                
+            # TOP EDGE
+            if force_on_screen and current_y < margin:
+                new_y = margin
+            elif current_y <= snap_threshold:
+                new_y = margin
+                
+            # BOTTOM EDGE
+            bottom_edge_distance = screen_height - (current_y + window_height)
+            if force_on_screen and current_y + window_height > screen_height - margin:
+                new_y = screen_height - window_height - margin
+            elif bottom_edge_distance <= snap_threshold:
+                new_y = screen_height - window_height - margin
+            
+        # Apply new position if it changed
+        if new_x != current_x or new_y != current_y:
+            window.geometry(f"+{new_x}+{new_y}")
+            return True
+        return False
+
     def toggle_decorations(self):
         """Toggle window decorations (title bar, borders)"""
-        current_state = self.root.overrideredirect()
-        self.root.overrideredirect(not current_state)
+        # Toggle decorations
+        current_borderless = self.root.overrideredirect()
+        self.root.overrideredirect(not current_borderless)
+        
+        # Ensure window fully updates after decoration change
+        self.root.update_idletasks()
+        self.root.update()
+        
+        # Snap to edges after window has completed all updates
+        self.root.after_idle(lambda: self.snap_to_edges_if_close(self.root))
         
     def toggle_fullscreen(self):
         """Toggle between fullscreen and windowed mode"""
@@ -227,37 +332,18 @@ class BaseOverlayWindow(ABC):
         """Start the window mainloop"""
         self.root.mainloop()
         
-    def ensure_on_screen(self, window, width, height, x, y):
-        """Ensure a window stays on screen by adjusting position if needed"""
-        screen_width = window.winfo_screenwidth()
-        screen_height = window.winfo_screenheight()
+    def snap_to_edges_if_close(self, window, snap_threshold=25):
+        """Snap window to screen edges if close enough (convenience wrapper)"""
+        return self.smart_position_window(window, snap_threshold=snap_threshold, force_on_screen=False)
         
-        # Ensure minimum margins from screen edges
-        min_margin = 1
+    def ensure_on_screen(self, window, width=None, height=None, x=None, y=None):
+        """Ensure a window stays on screen by adjusting position if needed
+        Legacy wrapper for smart_position_window with force_on_screen=True"""
+        # Use smart_position_window with force_on_screen enabled
+        self.smart_position_window(window, snap_threshold=0, force_on_screen=True)
         
-        # Adjust horizontal position
-        # Check if left edge is off-screen
-        if x < min_margin:
-            x = min_margin
-        # Check if right edge is off-screen
-        elif x + width > screen_width - min_margin:
-            x = screen_width - width - min_margin
-            
-        # Adjust vertical position
-        # Check if top edge is off-screen
-        if y < min_margin:
-            y = min_margin
-        # Check if bottom edge is off-screen
-        elif y + height > screen_height - min_margin:
-            y = screen_height - height - min_margin
-            
-        # Final safety check - if window is larger than screen, position at margin
-        if x < 0:
-            x = min_margin
-        if y < 0:
-            y = min_margin
-            
-        return x, y
+        # For backwards compatibility, return the final position
+        return window.winfo_x(), window.winfo_y()
         
     def position_window_safely(self, window, width, height, x, y):
         """Position a window safely on screen"""
