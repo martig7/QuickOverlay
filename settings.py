@@ -93,9 +93,9 @@ class SettingsManager:
         
         transparency_scale = tk.Scale(
             transparency_section,
-            from_=0.1,
+            from_=0.5,
             to=1.0,
-            resolution=0.1,
+            resolution=0.05,
             orient=tk.HORIZONTAL,
             variable=self.parent_overlay.transparency_var,
             command=self.parent_overlay.update_transparency,
