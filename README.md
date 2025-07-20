@@ -1,6 +1,166 @@
 # Image Overlay Application
 
-A tkinter-based image overlay application with modular architecture.
+A tkinter-based image overlay application with modular architecture and automated build system.
+
+## Quick Start
+
+1. **Download** or build `ImageOverlay.exe`
+2. **Double-click** to run - No installation required!
+3. **Load an image** using the button or right-click menu
+4. **Drag to position**, adjust transparency in settings
+
+## Features
+
+- **Image overlay display** with drag and drop positioning
+- **Off-screen prevention** - windows stay visible during dragging and positioning
+- **Transparency control** via settings
+- **Always on top** functionality
+- **Fullscreen mode** toggle
+- **Window frame** toggle (borderless mode)
+- **Context menu** with quick actions
+- **Keyboard shortcuts** (ESC to close)
+- **Modern dark theme** UI
+
+## Usage
+
+### Standalone Executable (Recommended)
+
+Simply run the standalone executable:
+```bash
+# Windows
+ImageOverlay.exe
+
+# Or double-click ImageOverlay.exe in your file explorer
+```
+
+### From Source (Development)
+
+If you need to run from source code:
+```bash
+python imgoverlay.py
+```
+
+## Testing
+
+### Automated Testing (Recommended)
+
+The build script includes comprehensive testing:
+```bash
+# Run all tests as part of build process
+python build.py --no-exe
+
+# Fast test run
+python build.py --no-exe --fast
+```
+
+### Manual Testing
+
+```bash
+# Run basic unit tests
+python test_overlay_simple.py
+
+# Run comprehensive test suite
+python run_tests.py
+```
+
+**Test Coverage:**
+- **Basic Functionality**: Core window operations, styling, positioning
+- **Manual Integration**: Component interaction and edge cases  
+- **File Structure**: Required files and module imports
+- **Performance**: Window creation and calculation speed
+
+## Dependencies
+
+- `tkinter` (built-in with Python)
+- `PIL` (Pillow) for image handling
+
+## Installation
+
+### For End Users
+
+1. **Download the executable** from the build artifacts or releases
+2. **Run ImageOverlay.exe** - No installation required!
+
+### For Developers
+
+1. **Clone or download the project files**
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **For development and building:**
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+
+## Building
+
+The project includes a comprehensive build script that tests, lints, and packages the application.
+
+### Quick Build (Recommended)
+
+Create a standalone executable for distribution:
+```bash
+python build.py --clean
+```
+
+This creates `build/executable/ImageOverlay.exe` - a single-file executable that requires no Python installation.
+
+### Build Options
+
+```bash
+# Default: Create standalone executable only
+python build.py
+
+# Fast build (skip slow tests)
+python build.py --fast
+
+# Clean build (remove previous build artifacts)
+python build.py --clean
+
+# Build without executable (tests/lint only)
+python build.py --no-exe
+
+# Include Python distribution package
+python build.py --include-python-dist
+
+# Skip specific steps
+python build.py --no-tests --no-lint
+
+# Quick development build
+python build.py --fast --no-lint
+```
+
+### Build Process
+
+The build script automatically:
+
+1. **Validates** project structure and dependencies
+2. **Runs tests** - Unit tests and integration tests
+3. **Checks code quality** - Syntax validation and linting (if available)
+4. **Creates executable** - Single-file standalone application using PyInstaller
+5. **Generates reports** - Detailed build reports and logs
+
+### Build Output
+
+```
+build/
+├── executable/              # Main distribution
+│   ├── ImageOverlay.exe     # Standalone executable (29MB)
+│   └── README.md           # Usage instructions
+├── dist/                   # Python distribution (optional)
+├── reports/                # Build reports and logs
+│   ├── build_report.md     # Comprehensive build summary
+│   ├── test_results.txt    # Test execution details
+│   └── pyinstaller_log.txt # Executable build log
+└── pyinstaller_temp/       # Temporary build files
+```
+
+### Distribution
+
+For internal distribution, simply copy the `build/executable/` folder to the target system. The executable requires no Python installation or dependencies.
 
 ## Project Structure
 
@@ -27,62 +187,6 @@ Main overlay functionality focused on image display:
 - **Event handling**: Keyboard shortcuts and window events
 - **Integration**: Uses base class and settings manager
 
-## Usage
-
-Run the application:
-```bash
-python imgoverlay.py
-```
-
-## Testing
-
-The project includes comprehensive unit tests:
-
-```bash
-# Run basic unit tests
-python test_overlay_simple.py
-
-# Run comprehensive test suite
-python run_tests.py
-```
-
-**Test Coverage:**
-- **Basic Functionality**: Core window operations, styling, positioning
-- **Manual Integration**: Component interaction and edge cases  
-- **File Structure**: Required files and module imports
-- **Performance**: Window creation and calculation speed
-
-## Dependencies
-
-- `tkinter` (built-in with Python)
-- `PIL` (Pillow) for image handling
-
-## Installation
-
-1. **Clone or download the project files**
-
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **For development (optional):**
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
-
-## Features
-
-- **Image overlay display** with drag and drop positioning
-- **Off-screen prevention** - windows stay visible during dragging and positioning
-- **Transparency control** via settings
-- **Always on top** functionality
-- **Fullscreen mode** toggle
-- **Window frame** toggle (borderless mode)
-- **Context menu** with quick actions
-- **Keyboard shortcuts** (ESC to close)
-- **Modern dark theme** UI
-
 ## Architecture Notes
 
 - `BaseOverlayWindow` is an abstract base class that enforces the `create_widgets()` method
@@ -91,21 +195,3 @@ python run_tests.py
 - Drag functionality is unified and reusable across all components with off-screen prevention
 - Settings window lifecycle is properly managed to prevent multiple instances
 - Off-screen prevention ensures all windows remain visible and accessible regardless of screen size or position
-
-## Project Files
-
-### Core Application:
-- **`base.py`** - Abstract base class with shared functionality
-- **`settings.py`** - Settings window manager
-- **`imgoverlay.py`** - Main image overlay application
-
-### Dependencies:
-- **`requirements.txt`** - Required packages for running the application
-- **`requirements-dev.txt`** - Additional packages for development
-
-### Testing:
-- **`test_overlay_simple.py`** - Unit tests for core functionality
-- **`run_tests.py`** - Comprehensive test runner with reporting
-
-### Documentation:
-- **`README.md`** - This documentation file
