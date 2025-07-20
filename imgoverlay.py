@@ -15,6 +15,11 @@ class ImageOverlay(BaseOverlayWindow):
         self.current_image = None
         self.aspect_ratio = None
         self.settings_manager = SettingsManager(self)
+        
+        # Track window state for smart clearing
+        self.pre_image_state = None  # (x, y, width, height) before loading image
+        self.post_image_state = None  # (x, y, width, height) after loading image
+        
         self.setup_window()
         self.create_widgets()
         
@@ -107,6 +112,13 @@ class ImageOverlay(BaseOverlayWindow):
             return
             
         try:
+            # Store window state before loading image
+            current_x = self.root.winfo_x()
+            current_y = self.root.winfo_y()
+            current_width = self.root.winfo_width()
+            current_height = self.root.winfo_height()
+            self.pre_image_state = (current_x, current_y, current_width, current_height)
+            
             # Load the original image
             self.original_image = Image.open(self.image_path)
             img_width, img_height = self.original_image.size
@@ -133,15 +145,34 @@ class ImageOverlay(BaseOverlayWindow):
             window_width = target_width + 20  # Padding for frame
             window_height = target_height + 50  # Padding for top bar and frame
             
-            # Get current window position
-            current_x = self.root.winfo_x()
-            current_y = self.root.winfo_y()
-            
             # Resize and reposition window
             self.root.geometry(f"{window_width}x{window_height}+{current_x}+{current_y}")
             
             # Wait for window to resize
             self.root.update_idletasks()
+            
+            # Ensure the resized window stays on screen (especially important when borderless)
+            # This prevents the settings button and controls from becoming inaccessible
+            # when loading images near screen edges with window frame toggled off
+            safe_x, safe_y = self.ensure_on_screen(
+                self.root, 
+                window_width, 
+                window_height, 
+                current_x, 
+                current_y
+            )
+            
+            # Apply safe positioning if needed
+            if safe_x != current_x or safe_y != current_y:
+                self.root.geometry(f"{window_width}x{window_height}+{safe_x}+{safe_y}")
+                self.root.update_idletasks()
+            
+            # Store final window state after loading and positioning
+            final_x = self.root.winfo_x()
+            final_y = self.root.winfo_y()
+            final_width = self.root.winfo_width()
+            final_height = self.root.winfo_height()
+            self.post_image_state = (final_x, final_y, final_width, final_height)
             
             # Now display the image at the calculated size
             self._update_image_display()
@@ -217,7 +248,7 @@ class ImageOverlay(BaseOverlayWindow):
             self.root.after_idle(self._update_image_display)
             
     def clear_image(self):
-        """Clear the current image"""
+        """Clear the current image with smart window positioning"""
         if self.image_label:
             self.image_label.destroy()
             self.image_label = None
@@ -237,8 +268,69 @@ class ImageOverlay(BaseOverlayWindow):
         self.current_image = None
         self.aspect_ratio = None
         
-        # Reset window to default size
-        self.center_window(400, 300)
+        # Smart window positioning: maintain current position but resize appropriately
+        current_x = self.root.winfo_x()
+        current_y = self.root.winfo_y()
+        
+        # Target size for cleared state
+        target_width = 400
+        target_height = 300
+        
+        # If we have tracking data about how the window expanded, try to contract intelligently
+        if self.pre_image_state and self.post_image_state:
+            pre_x, pre_y, pre_width, pre_height = self.pre_image_state
+            post_x, post_y, post_width, post_height = self.post_image_state
+            
+            # Calculate how the window was adjusted when the image was loaded
+            x_offset = post_x - pre_x
+            y_offset = post_y - pre_y
+            width_change = post_width - pre_width
+            height_change = post_height - pre_height
+            
+            # Try to reverse the expansion logic
+            # If window moved left (x_offset < 0), it was because it expanded right and hit screen edge
+            # So when contracting, we should move it back right
+            if x_offset < 0 and width_change > 0:
+                # Window was pushed left due to right expansion, contract by moving right
+                clear_x = current_x + (post_width - target_width)
+            # If window moved right (x_offset > 0), it expanded left, so stay put when contracting
+            elif x_offset > 0 and width_change > 0:
+                # Window was moved right due to left expansion, keep current position
+                clear_x = current_x
+            else:
+                # No horizontal adjustment needed or unclear case, keep current position
+                clear_x = current_x
+            
+            # Similar logic for vertical positioning
+            if y_offset < 0 and height_change > 0:
+                # Window was pushed up due to bottom expansion, contract by moving down
+                clear_y = current_y + (post_height - target_height)
+            elif y_offset > 0 and height_change > 0:
+                # Window was moved down due to top expansion, keep current position
+                clear_y = current_y
+            else:
+                # No vertical adjustment needed or unclear case, keep current position
+                clear_y = current_y
+        else:
+            # No tracking data, just maintain current position
+            clear_x = current_x
+            clear_y = current_y
+        
+        # Ensure the cleared window position is safe
+        safe_x, safe_y = self.ensure_on_screen(
+            self.root, 
+            target_width, 
+            target_height, 
+            clear_x, 
+            clear_y
+        )
+        
+        # Apply the new size and position
+        self.root.geometry(f"{target_width}x{target_height}+{safe_x}+{safe_y}")
+        
+        # Clear the tracking data
+        self.pre_image_state = None
+        self.post_image_state = None
         
     def show_context_menu(self, event):
         """Show context menu on right-click"""

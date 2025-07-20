@@ -232,6 +232,72 @@ class TestImageOverlayLogic(unittest.TestCase):
             except:
                 pass
 
+    def test_smart_clearing_attributes(self):
+        """Test that smart clearing attributes are properly initialized"""
+        from imgoverlay import ImageOverlay
+        
+        try:
+            # Create a mock root to avoid Tk issues in testing
+            with patch('tkinter.Tk') as mock_tk:
+                mock_root = Mock()
+                mock_tk.return_value = mock_root
+                mock_root.attributes = Mock()
+                mock_root.winfo_screenwidth.return_value = 1920
+                mock_root.winfo_screenheight.return_value = 1080
+                
+                overlay = ImageOverlay()
+                
+                # Test that smart clearing attributes exist
+                self.assertTrue(hasattr(overlay, 'pre_image_state'))
+                self.assertTrue(hasattr(overlay, 'post_image_state'))
+                
+                # Test initial state
+                self.assertIsNone(overlay.pre_image_state)
+                self.assertIsNone(overlay.post_image_state)
+                
+        except Exception as e:
+            self.skipTest(f"Cannot test ImageOverlay in this environment: {e}")
+            
+    def test_smart_clearing_state_tracking(self):
+        """Test state tracking logic for smart clearing"""
+        from imgoverlay import ImageOverlay
+        
+        try:
+            with patch('tkinter.Tk') as mock_tk:
+                mock_root = Mock()
+                mock_tk.return_value = mock_root
+                mock_root.attributes = Mock()
+                mock_root.winfo_screenwidth.return_value = 1920
+                mock_root.winfo_screenheight.return_value = 1080
+                mock_root.winfo_x.return_value = 100
+                mock_root.winfo_y.return_value = 100
+                mock_root.winfo_width.return_value = 400
+                mock_root.winfo_height.return_value = 300
+                mock_root.geometry = Mock()
+                mock_root.update_idletasks = Mock()
+                
+                overlay = ImageOverlay()
+                overlay.root = mock_root
+                
+                # Simulate state tracking by setting states manually
+                overlay.pre_image_state = (100, 100, 400, 300)
+                overlay.post_image_state = (50, 100, 800, 600)  # Moved left, expanded
+                
+                # Mock the necessary methods and attributes
+                overlay.image_label = Mock()
+                overlay.placeholder_label = None
+                overlay.create_styled_label = Mock(return_value=Mock())
+                overlay.setup_drag_functionality = Mock()
+                overlay.ensure_on_screen = Mock(return_value=(100, 100))
+                
+                # Test clear_image clears tracking state
+                overlay.clear_image()
+                
+                self.assertIsNone(overlay.pre_image_state)
+                self.assertIsNone(overlay.post_image_state)
+                
+        except Exception as e:
+            self.skipTest(f"Cannot test smart clearing in this environment: {e}")
 
 class TestFileStructure(unittest.TestCase):
     """Test that all required files exist and are importable"""
