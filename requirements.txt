@@ -1,0 +1,23 @@
+# Image Overlay Application Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core image processing library
+# Required for loading, resizing, and displaying images
+Pillow>=10.0.0
+
+# Note: tkinter is included with Python standard library
+# No additional installation required for tkinter
+
+# Development dependencies (optional)
+# Uncomment if you want to run tests or development tools
+
+# For enhanced testing capabilities
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# For code formatting and linting
+# black>=23.0.0
+# flake8>=6.0.0
+
+# For type checking
+# mypy>=1.0.0
