@@ -23,6 +23,9 @@ class ImageOverlay(BaseOverlayWindow):
 
         self.setup_window()
         self.create_widgets()
+        
+        # Set up post-drag callback for smooth image updates
+        self._post_drag_callback = self._update_image_display
 
     def setup_window(self):
         """Configure the overlay-specific window properties"""
@@ -79,17 +82,17 @@ class ImageOverlay(BaseOverlayWindow):
         )
         self.placeholder_label.pack(expand=True)
 
-        # Make placeholder clickable
-        self.placeholder_label.bind('<Button-1>', lambda e: self.load_image())
+        # Make placeholder both clickable and draggable
         self.placeholder_label.configure(cursor='hand2')  # Show hand cursor on hover
+        self.setup_clickable_drag_functionality(self.placeholder_label, self.load_image)
 
         # Bind events
         self.root.bind('<Escape>', lambda e: self.close_overlay())
         self.root.bind('<Button-3>', self.show_context_menu)
         self.root.bind('<Configure>', self.on_window_resize)
 
-        # Enable dragging for multiple elements for better usability
-        self.setup_drag_functionality(main_frame, self.image_frame, self.placeholder_label, top_bar)
+        # Enable dragging for multiple elements for better usability (excluding placeholder)
+        self.setup_drag_functionality(main_frame, self.image_frame, top_bar)
 
     def load_image(self):
         """Load an image file"""
@@ -247,6 +250,10 @@ class ImageOverlay(BaseOverlayWindow):
         if event.widget != self.root:
             return
 
+        # Skip resize handling if we're currently dragging to avoid lag
+        if hasattr(self, 'drag_data') and self.drag_data.get("dragging", False):
+            return
+
         # If we have an image loaded and aspect ratio stored
         if self.original_image and self.aspect_ratio:
             # Update the image display
@@ -265,11 +272,9 @@ class ImageOverlay(BaseOverlayWindow):
                 style='large'
             )
             self.placeholder_label.pack(expand=True)
-            # Make placeholder clickable
-            self.placeholder_label.bind('<Button-1>', lambda e: self.load_image())
+            # Make placeholder both clickable and draggable
             self.placeholder_label.configure(cursor='hand2')  # Show hand cursor on hover
-            # Enable dragging for placeholder (but avoid conflicts with click)
-            self.setup_drag_functionality(self.placeholder_label)
+            self.setup_clickable_drag_functionality(self.placeholder_label, self.load_image)
 
         self.image_path = None
         self.original_image = None
@@ -373,9 +378,6 @@ class ImageOverlay(BaseOverlayWindow):
         print("- Right-click: Context menu")
         print("- Drag window: Click and drag")
         print("- Load Image: Use button, click placeholder text, or context menu")
-        print("- Window resizes to image size automatically")
-        print("- Image scales with window while maintaining aspect ratio")
-        print("- Smart clearing: Window stays in position when clearing images")
 
         super().run()
 

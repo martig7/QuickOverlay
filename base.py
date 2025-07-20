@@ -30,6 +30,7 @@ class BaseOverlayWindow(ABC):
         # Initialize drag tracking
         self.drag_data = {"x": 0, "y": 0, "dragging": False}
         self.transparency_var = tk.DoubleVar(value=0.8)
+        self._post_drag_callback = None  # Optional callback after dragging ends
         self._setup_base_window(title)
         
     def _setup_base_window(self, title):
@@ -160,8 +161,8 @@ class BaseOverlayWindow(ABC):
         new_x = event.x_root - self.drag_data["x"]
         new_y = event.y_root - self.drag_data["y"]
         
-        # Move the window immediately for smooth dragging
-        self.root.geometry(f"+{new_x}+{new_y}")
+        # Move the window immediately for smooth dragging (position only)
+        self.root.wm_geometry(f"+{new_x}+{new_y}")
         
     def end_drag(self, event):
         """End window dragging and ensure safe position"""
@@ -181,7 +182,12 @@ class BaseOverlayWindow(ABC):
                 self.root.geometry(f"+{safe_x}+{safe_y}")
         
         # Reset dragging state
+        was_dragging = self.drag_data["dragging"]
         self.drag_data["dragging"] = False
+        
+        # Call post-drag callback if one was dragging and callback exists
+        if was_dragging and self._post_drag_callback is not None:
+            self.root.after_idle(self._post_drag_callback)
         
     def update_transparency(self, value):
         """Update window transparency"""
@@ -227,7 +233,7 @@ class BaseOverlayWindow(ABC):
         screen_height = window.winfo_screenheight()
         
         # Ensure minimum margins from screen edges
-        min_margin = 10
+        min_margin = 1
         
         # Adjust horizontal position
         # Check if left edge is off-screen
