@@ -27,7 +27,8 @@ class BaseOverlayWindow(ABC):
     def __init__(self, title="Overlay Window"):
         """Initialize base window with common settings"""
         self.root = tk.Tk()
-        self.drag_data = {"x": 0, "y": 0}
+        # Initialize drag tracking
+        self.drag_data = {"x": 0, "y": 0, "dragging": False}
         self.transparency_var = tk.DoubleVar(value=0.8)
         self._setup_base_window(title)
         
@@ -141,24 +142,46 @@ class BaseOverlayWindow(ABC):
         for widget in widgets:
             widget.bind('<Button-1>', self.start_drag)
             widget.bind('<B1-Motion>', self.on_drag)
+            widget.bind('<ButtonRelease-1>', self.end_drag)
             
     def start_drag(self, event):
         """Start window dragging"""
-        self.drag_data["x"] = event.x
-        self.drag_data["y"] = event.y
+        # Store the initial mouse position relative to the window
+        self.drag_data["x"] = event.x_root - self.root.winfo_x()
+        self.drag_data["y"] = event.y_root - self.root.winfo_y()
+        self.drag_data["dragging"] = False
         
     def on_drag(self, event):
         """Handle window dragging"""
-        new_x = self.root.winfo_x() + (event.x - self.drag_data["x"])
-        new_y = self.root.winfo_y() + (event.y - self.drag_data["y"])
+        # Mark as dragging to distinguish from clicks
+        self.drag_data["dragging"] = True
         
-        # Get current window size
-        window_width = self.root.winfo_width()
-        window_height = self.root.winfo_height()
+        # Calculate new window position based on mouse position
+        new_x = event.x_root - self.drag_data["x"]
+        new_y = event.y_root - self.drag_data["y"]
         
-        # Ensure the window stays on screen
-        safe_x, safe_y = self.ensure_on_screen(self.root, window_width, window_height, new_x, new_y)
-        self.root.geometry(f"+{safe_x}+{safe_y}")
+        # Move the window immediately for smooth dragging
+        self.root.geometry(f"+{new_x}+{new_y}")
+        
+    def end_drag(self, event):
+        """End window dragging and ensure safe position"""
+        # Only apply safe positioning if we actually dragged
+        if self.drag_data["dragging"]:
+            # Get current window position and size
+            current_x = self.root.winfo_x()
+            current_y = self.root.winfo_y()
+            window_width = self.root.winfo_width()
+            window_height = self.root.winfo_height()
+            
+            # Ensure the final position is safe (only at the end of drag)
+            safe_x, safe_y = self.ensure_on_screen(self.root, window_width, window_height, current_x, current_y)
+            
+            # If the position needed adjustment, move to safe position
+            if safe_x != current_x or safe_y != current_y:
+                self.root.geometry(f"+{safe_x}+{safe_y}")
+        
+        # Reset dragging state
+        self.drag_data["dragging"] = False
         
     def update_transparency(self, value):
         """Update window transparency"""
@@ -264,3 +287,19 @@ class BaseOverlayWindow(ABC):
             preferred_y = 10
             
         return preferred_x, preferred_y
+
+    def setup_clickable_drag_functionality(self, widget, click_callback):
+        """Enable both dragging and clicking for a widget"""
+        widget.bind('<Button-1>', self.start_drag)
+        widget.bind('<B1-Motion>', self.on_drag)
+        widget.bind('<ButtonRelease-1>', lambda e: self.end_drag_with_click(e, click_callback))
+        
+    def end_drag_with_click(self, event, click_callback):
+        """End drag and handle click if no dragging occurred"""
+        # Call the regular end_drag first
+        was_dragging = self.drag_data["dragging"]
+        self.end_drag(event)
+        
+        # If we weren't dragging, treat it as a click
+        if not was_dragging:
+            click_callback()
