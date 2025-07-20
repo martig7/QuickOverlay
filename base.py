@@ -224,30 +224,34 @@ class BaseOverlayWindow(ABC):
                 desktop_top = virtual_y  
                 desktop_bottom = virtual_y + virtual_height
                 
-                # Only snap/constrain to the outer edges of the entire desktop
-                # LEFT EDGE (leftmost edge of all monitors)
-                if force_on_screen and current_x < desktop_left + margin:
-                    new_x = desktop_left + margin
-                elif abs(current_x - desktop_left) <= snap_threshold:
-                    new_x = desktop_left + margin
-                
-                # RIGHT EDGE (rightmost edge of all monitors)
-                if force_on_screen and current_x + window_width > desktop_right - margin:
-                    new_x = desktop_right - window_width - margin
-                elif abs(current_x + window_width - desktop_right) <= snap_threshold:
-                    new_x = desktop_right - window_width - margin
+                # Check if window is larger than virtual screen - fall back to single monitor
+                if window_width > virtual_width or window_height > virtual_height:
+                    allow_multi_monitor = False
+                else:
+                    # Only snap/constrain to the outer edges of the entire desktop
+                    # LEFT EDGE (leftmost edge of all monitors)
+                    if force_on_screen and current_x < desktop_left + margin:
+                        new_x = desktop_left + margin
+                    elif abs(current_x - desktop_left) <= snap_threshold:
+                        new_x = desktop_left + margin
                     
-                # TOP EDGE (topmost edge of all monitors)
-                if force_on_screen and current_y < desktop_top + margin:
-                    new_y = desktop_top + margin
-                elif abs(current_y - desktop_top) <= snap_threshold:
-                    new_y = desktop_top + margin
-                    
-                # BOTTOM EDGE (bottommost edge of all monitors)
-                if force_on_screen and current_y + window_height > desktop_bottom - margin:
-                    new_y = desktop_bottom - window_height - margin
-                elif abs(current_y + window_height - desktop_bottom) <= snap_threshold:
-                    new_y = desktop_bottom - window_height - margin
+                    # RIGHT EDGE (rightmost edge of all monitors)
+                    if force_on_screen and current_x + window_width > desktop_right - margin:
+                        new_x = desktop_right - window_width - margin
+                    elif abs(current_x + window_width - desktop_right) <= snap_threshold:
+                        new_x = desktop_right - window_width - margin
+                        
+                    # TOP EDGE (topmost edge of all monitors)
+                    if force_on_screen and current_y < desktop_top + margin:
+                        new_y = desktop_top + margin
+                    elif abs(current_y - desktop_top) <= snap_threshold:
+                        new_y = desktop_top + margin
+                        
+                    # BOTTOM EDGE (bottommost edge of all monitors)
+                    if force_on_screen and current_y + window_height > desktop_bottom - margin:
+                        new_y = desktop_bottom - window_height - margin
+                    elif abs(current_y + window_height - desktop_bottom) <= snap_threshold:
+                        new_y = desktop_bottom - window_height - margin
                     
             except:
                 # Fallback to single monitor mode if virtual screen info fails
@@ -267,7 +271,11 @@ class BaseOverlayWindow(ABC):
             # RIGHT EDGE
             right_edge_distance = screen_width - (current_x + window_width)
             if force_on_screen and current_x + window_width > screen_width - margin:
-                new_x = screen_width - window_width - margin
+                # For oversized windows, position at margin
+                if window_width > screen_width - 2 * margin:
+                    new_x = margin
+                else:
+                    new_x = screen_width - window_width - margin
             elif right_edge_distance <= snap_threshold:
                 new_x = screen_width - window_width - margin
                 
@@ -280,7 +288,11 @@ class BaseOverlayWindow(ABC):
             # BOTTOM EDGE
             bottom_edge_distance = screen_height - (current_y + window_height)
             if force_on_screen and current_y + window_height > screen_height - margin:
-                new_y = screen_height - window_height - margin
+                # For oversized windows, position at margin
+                if window_height > screen_height - 2 * margin:
+                    new_y = margin
+                else:
+                    new_y = screen_height - window_height - margin
             elif bottom_edge_distance <= snap_threshold:
                 new_y = screen_height - window_height - margin
             
@@ -316,7 +328,14 @@ class BaseOverlayWindow(ABC):
         
     def minimize_window(self):
         """Minimize the window"""
-        self.root.iconify()
+        # Can't minimize borderless windows - temporarily enable decorations
+        if self.root.overrideredirect():
+            self.root.overrideredirect(False)
+            self.root.update_idletasks()
+            self.root.iconify()
+            # Note: Window will have decorations when restored
+        else:
+            self.root.iconify()
         
     def close_window(self):
         """Close the window"""

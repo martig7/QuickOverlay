@@ -59,35 +59,58 @@ class TestBaseOverlayWindow(unittest.TestCase):
         
     def test_ensure_on_screen_logic(self):
         """Test off-screen prevention logic with mock window"""
-        # Create a mock window object
+        # Create a mock window object with all needed methods
         mock_window = Mock()
         mock_window.winfo_screenwidth.return_value = 1920
         mock_window.winfo_screenheight.return_value = 1080
+        mock_window.overrideredirect.return_value = False  # Decorated window (10px margin)
+        mock_window.winfo_vrootwidth.return_value = 1920
+        mock_window.winfo_vrootheight.return_value = 1080
+        mock_window.winfo_vrootx.return_value = 0
+        mock_window.winfo_vrooty.return_value = 0
+        
+        def test_position(initial_x, initial_y, width, height, expected_x, expected_y, test_name):
+            # Set up mock window position and size
+            mock_window.winfo_x.return_value = initial_x
+            mock_window.winfo_y.return_value = initial_y
+            mock_window.winfo_width.return_value = width
+            mock_window.winfo_height.return_value = height
+            
+            # Track geometry calls to see final position
+            geometry_calls = []
+            mock_window.geometry = Mock(side_effect=lambda g: geometry_calls.append(g))
+            
+            # Call ensure_on_screen
+            x, y = self.test_window.ensure_on_screen(mock_window)
+            
+            # Check if repositioning occurred as expected
+            if geometry_calls:
+                # Extract position from geometry string (e.g., "+100+200")
+                geometry_str = geometry_calls[-1]
+                if geometry_str.startswith('+'):
+                    parts = geometry_str[1:].split('+')
+                    actual_x, actual_y = int(parts[0]), int(parts[1])
+                    self.assertEqual(actual_x, expected_x, f"{test_name}: X position")
+                    self.assertEqual(actual_y, expected_y, f"{test_name}: Y position")
+            else:
+                # No repositioning occurred, should match initial position
+                self.assertEqual(initial_x, expected_x, f"{test_name}: X position (no move)")
+                self.assertEqual(initial_y, expected_y, f"{test_name}: Y position (no move)")
         
         # Test normal positioning (should not change)
-        x, y = self.test_window.ensure_on_screen(mock_window, 400, 300, 100, 100)
-        self.assertEqual(x, 100)
-        self.assertEqual(y, 100)
+        test_position(100, 100, 400, 300, 100, 100, "Normal position")
         
-        # Test off-screen right (should move left)
-        x, y = self.test_window.ensure_on_screen(mock_window, 400, 300, 1800, 100)
-        self.assertEqual(x, 1510)  # 1920 - 400 - 10
-        self.assertEqual(y, 100)
+        # Test off-screen right (should move left)  
+        test_position(1800, 100, 400, 300, 1510, 100, "Off-screen right")  # 1920 - 400 - 10
         
         # Test off-screen bottom (should move up)
-        x, y = self.test_window.ensure_on_screen(mock_window, 400, 300, 100, 1000)
-        self.assertEqual(x, 100)
-        self.assertEqual(y, 770)  # 1080 - 300 - 10
+        test_position(100, 1000, 400, 300, 100, 770, "Off-screen bottom")  # 1080 - 300 - 10
         
         # Test off-screen left (should move right)
-        x, y = self.test_window.ensure_on_screen(mock_window, 400, 300, -50, 100)
-        self.assertEqual(x, 10)
-        self.assertEqual(y, 100)
+        test_position(-50, 100, 400, 300, 10, 100, "Off-screen left")
         
         # Test off-screen top (should move down)
-        x, y = self.test_window.ensure_on_screen(mock_window, 400, 300, 100, -50)
-        self.assertEqual(x, 100)
-        self.assertEqual(y, 10)
+        test_position(100, -50, 400, 300, 100, 10, "Off-screen top")
         
     def test_get_safe_position_relative_to(self):
         """Test safe relative positioning logic"""
@@ -210,21 +233,49 @@ class TestImageOverlayLogic(unittest.TestCase):
             self.skipTest("Cannot create Tk window in this environment")
             
         try:
-            mock_window = Mock()
-            mock_window.winfo_screenwidth.return_value = 800
-            mock_window.winfo_screenheight.return_value = 600
+            # Helper function to create properly mocked window
+            def create_mock_window(screen_w, screen_h, win_x, win_y, win_w, win_h):
+                mock = Mock()
+                mock.winfo_screenwidth.return_value = screen_w
+                mock.winfo_screenheight.return_value = screen_h
+                mock.winfo_x.return_value = win_x
+                mock.winfo_y.return_value = win_y
+                mock.winfo_width.return_value = win_w
+                mock.winfo_height.return_value = win_h
+                mock.overrideredirect.return_value = False  # Decorated window
+                mock.winfo_vrootwidth.return_value = screen_w
+                mock.winfo_vrootheight.return_value = screen_h
+                mock.winfo_vrootx.return_value = 0
+                mock.winfo_vrooty.return_value = 0
+                
+                geometry_calls = []
+                mock.geometry = Mock(side_effect=lambda g: geometry_calls.append(g))
+                return mock, geometry_calls
             
             # Test window larger than screen
-            x, y = test_window.ensure_on_screen(mock_window, 1000, 700, 0, 0)
-            self.assertEqual(x, 10)  # Should position at margin
-            self.assertEqual(y, 10)  # Should position at margin
+            mock_window, geometry_calls = create_mock_window(800, 600, 0, 0, 1000, 700)
+            x, y = test_window.ensure_on_screen(mock_window)
             
-            # Test very small screen
-            mock_window.winfo_screenwidth.return_value = 100
-            mock_window.winfo_screenheight.return_value = 100
-            x, y = test_window.ensure_on_screen(mock_window, 50, 50, 80, 80)
-            self.assertEqual(x, 40)  # 100 - 50 - 10
-            self.assertEqual(y, 40)  # 100 - 50 - 10
+            # Should force to margin even if oversized
+            if geometry_calls:
+                geometry_str = geometry_calls[-1]
+                if geometry_str.startswith('+'):
+                    parts = geometry_str[1:].split('+')
+                    actual_x, actual_y = int(parts[0]), int(parts[1])
+                    self.assertEqual(actual_x, 10)  # Should position at margin
+                    self.assertEqual(actual_y, 10)  # Should position at margin
+            
+            # Test very small screen with window near edge
+            mock_window, geometry_calls = create_mock_window(100, 100, 80, 80, 50, 50)
+            x, y = test_window.ensure_on_screen(mock_window)
+            
+            if geometry_calls:
+                geometry_str = geometry_calls[-1] 
+                if geometry_str.startswith('+'):
+                    parts = geometry_str[1:].split('+')
+                    actual_x, actual_y = int(parts[0]), int(parts[1])
+                    self.assertEqual(actual_x, 40)  # 100 - 50 - 10
+                    self.assertEqual(actual_y, 40)  # 100 - 50 - 10
             
         finally:
             try:

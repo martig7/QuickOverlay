@@ -53,19 +53,41 @@ def run_manual_tests() -> bool:
         
         test_window = TestWindow("Test")
         
-        # Mock window for testing
+        # Mock window for testing with all required methods
         class MockWindow:
+            def __init__(self, x=0, y=0, width=400, height=300):
+                self.x = x
+                self.y = y
+                self.width = width
+                self.height = height
+                self.geometry_calls = []
+                
             def winfo_screenwidth(self): return 1920
             def winfo_screenheight(self): return 1080
-        
-        mock_win = MockWindow()
+            def winfo_x(self): return self.x
+            def winfo_y(self): return self.y
+            def winfo_width(self): return self.width
+            def winfo_height(self): return self.height
+            def overrideredirect(self): return False  # Decorated window
+            def winfo_vrootwidth(self): return 1920
+            def winfo_vrootheight(self): return 1080
+            def winfo_vrootx(self): return 0
+            def winfo_vrooty(self): return 0
+            def geometry(self, geom_str):
+                self.geometry_calls.append(geom_str)
+                # Extract position from geometry string for verification
+                if geom_str.startswith('+'):
+                    parts = geom_str[1:].split('+')
+                    self.x, self.y = int(parts[0]), int(parts[1])
         
         # Test edge cases
-        x, y = test_window.ensure_on_screen(mock_win, 400, 300, -100, -100)
-        assert x >= 10 and y >= 10, "Failed to handle negative coordinates"
+        mock_win = MockWindow(-100, -100, 400, 300)
+        x, y = test_window.ensure_on_screen(mock_win)
+        assert mock_win.x >= 10 and mock_win.y >= 10, "Failed to handle negative coordinates"
         
-        x, y = test_window.ensure_on_screen(mock_win, 400, 300, 2000, 2000)
-        assert x <= 1510 and y <= 770, "Failed to handle off-screen coordinates"
+        mock_win = MockWindow(2000, 2000, 400, 300)
+        x, y = test_window.ensure_on_screen(mock_win)
+        assert mock_win.x <= 1510 and mock_win.y <= 770, "Failed to handle off-screen coordinates"
         
         test_window.root.destroy()
         
@@ -145,14 +167,34 @@ def run_performance_tests() -> bool:
         
         # Test off-screen calculation performance
         class MockWindow:
+            def __init__(self, x=0, y=0, width=400, height=300):
+                self.x = x
+                self.y = y
+                self.width = width
+                self.height = height
+                self.geometry_calls = []
+                
             def winfo_screenwidth(self): return 1920
             def winfo_screenheight(self): return 1080
-        
-        mock_win = MockWindow()
+            def winfo_x(self): return self.x
+            def winfo_y(self): return self.y
+            def winfo_width(self): return self.width
+            def winfo_height(self): return self.height
+            def overrideredirect(self): return False  # Decorated window
+            def winfo_vrootwidth(self): return 1920
+            def winfo_vrootheight(self): return 1080
+            def winfo_vrootx(self): return 0
+            def winfo_vrooty(self): return 0
+            def geometry(self, geom_str):
+                self.geometry_calls.append(geom_str)
+                if geom_str.startswith('+'):
+                    parts = geom_str[1:].split('+')
+                    self.x, self.y = int(parts[0]), int(parts[1])
         
         start_time = time.time()
+        mock_win = MockWindow(100, 100, 400, 300)
         for _ in range(1000):
-            test_window.ensure_on_screen(mock_win, 400, 300, 100, 100)
+            test_window.ensure_on_screen(mock_win)
         calc_time = time.time() - start_time
         
         print(f"✓ 1000 off-screen calculations: {calc_time:.3f}s")
